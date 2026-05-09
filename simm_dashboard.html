@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIMM Initial Margin Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --glass-bg: rgba(255,255,255,0.55);
+    --glass-border: rgba(255,255,255,0.75);
+    --glass-shadow: 0 8px 32px rgba(100,100,140,0.10);
+    --glass-blur: blur(18px);
+    --accent: #6366f1;
+    --accent-soft: rgba(99,102,241,0.12);
+    --accent-glow: rgba(99,102,241,0.25);
+    --green: #10b981;
+    --green-soft: rgba(16,185,129,0.12);
+    --amber: #f59e0b;
+    --amber-soft: rgba(245,158,11,0.12);
+    --red: #ef4444;
+    --text-primary: #1a1a2e;
+    --text-secondary: #64648a;
+    --text-tertiary: #a0a0c0;
+    --bg-gradient: linear-gradient(135deg, #f0f0ff 0%, #e8eeff 35%, #f5f0ff 65%, #eef5ff 100%);
+    --orb1: radial-gradient(ellipse at 20% 20%, rgba(139,92,246,0.18) 0%, transparent 60%);
+    --orb2: radial-gradient(ellipse at 80% 70%, rgba(99,102,241,0.14) 0%, transparent 55%);
+    --orb3: radial-gradient(ellipse at 60% 10%, rgba(236,72,153,0.08) 0%, transparent 50%);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --radius-xs: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg-gradient);
+    min-height: 100vh;
+    color: var(--text-primary);
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: var(--orb1), var(--orb2), var(--orb3);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .noise {
+    position: fixed;
+    inset: 0;
+    opacity: 0.025;
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 200px;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 24px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    box-shadow: var(--glass-shadow);
+  }
+
+  .header-left { display: flex; align-items: center; gap: 14px; }
+
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 500; font-size: 13px;
+    letter-spacing: -0.02em;
+    box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+  }
+
+  .header-title { font-size: 15px; font-weight: 500; color: var(--text-primary); }
+  .header-sub { font-size: 12px; color: var(--text-secondary); margin-top: 1px; }
+
+  .version-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; padding: 4px 10px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 20px;
+    border: 1px solid var(--accent-glow);
+    font-weight: 400;
+  }
+
+  /* MAIN GRID */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 260px 1fr 320px;
+    gap: 16px;
+    flex: 1;
+  }
+
+  /* GLASS CARD */
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    box-shadow: var(--glass-shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255,255,255,0.3);
+  }
+
+  .card-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .card-title svg { opacity: 0.5; }
+
+  /* SEARCH */
+  .search-wrap { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.5); }
+
+  .search-input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    background: rgba(255,255,255,0.6);
+    border: 1px solid rgba(255,255,255,0.8);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    outline: none;
+    transition: all 0.2s;
+  }
+
+  .search-input::placeholder { color: var(--text-tertiary); }
+  .search-input:focus { border-color: var(--accent-glow); background: rgba(255,255,255,0.8); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  /* PRODUCT LIST */
+  .product-scroll { flex: 1; overflow-y: auto; padding: 8px; }
+  .product-scroll::-webkit-scrollbar { width: 4px; }
+  .product-scroll::-webkit-scrollbar-track { background: transparent; }
+  .product-scroll::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.2); border-radius: 2px; }
+
+  .product-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 1px solid transparent;
+    margin-bottom: 3px;
+    transition: all 0.15s;
+    gap: 8px;
+  }
+
+  .product-item:hover {
+    background: rgba(255,255,255,0.6);
+    border-color: rgba(255,255,255,0.9);
+    box-shadow: 0 2px 8px rgba(100,100,180,0.08);
+  }
+
+  .product-item.added { opacity: 0.4; pointer-events: none; }
+
+  .product-info { flex: 1; min-width: 0; }
+  .product-name { font-size: 13px; font-weight: 400; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .product-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+
+  .type-pill {
+    font-size: 10px; padding: 2px 7px;
+    border-radius: 20px; font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  .pill-ir { background: rgba(99,102,241,0.12); color: #4f46e5; border: 1px solid rgba(99,102,241,0.2); }
+  .pill-fx { background: rgba(16,185,129,0.12); color: #059669; border: 1px solid rgba(16,185,129,0.2); }
+  .pill-eq { background: rgba(245,158,11,0.12); color: #d97706; border: 1px solid rgba(245,158,11,0.2); }
+
+  .add-btn {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(200,200,240,0.6);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--text-secondary); flex-shrink: 0;
+    transition: all 0.15s; font-size: 18px; line-height: 1;
+  }
+
+  .add-btn:hover { background: var(--accent); border-color: var(--accent); color: white; box-shadow: 0 2px 8px var(--accent-glow); transform: scale(1.05); }
+
+  /* MIDDLE PANEL */
+  .middle-col { display: flex; flex-direction: column; gap: 16px; }
+
+  .portfolio-card { flex: 1; }
+
+  .col-labels {
+    display: grid;
+    grid-template-columns: 1fr 110px 90px 28px;
+    gap: 8px;
+    padding: 8px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.5);
+    font-size: 10px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: rgba(255,255,255,0.2);
+  }
+
+  .portfolio-scroll { flex: 1; overflow-y: auto; padding: 10px; }
+  .portfolio-scroll::-webkit-scrollbar { width: 4px; }
+  .portfolio-scroll::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.2); border-radius: 2px; }
+
+  .portfolio-row {
+    display: grid;
+    grid-template-columns: 1fr 110px 90px 28px;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255,255,255,0.6);
+    margin-bottom: 6px;
+    background: rgba(255,255,255,0.4);
+    transition: all 0.15s;
+    animation: slideIn 0.2s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .portfolio-row:hover { background: rgba(255,255,255,0.65); border-color: rgba(255,255,255,0.9); }
+
+  .p-name { font-size: 13px; font-weight: 400; color: var(--text-primary); }
+  .p-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+
+  .sens-input {
+    width: 100%; font-size: 12px; font-family: 'DM Mono', monospace;
+    padding: 6px 8px;
+    border: 1px solid rgba(200,200,240,0.5);
+    border-radius: var(--radius-xs);
+    background: rgba(255,255,255,0.6);
+    color: var(--text-primary); text-align: right;
+    outline: none; transition: all 0.15s;
+  }
+
+  .sens-input:focus { border-color: var(--accent-glow); background: rgba(255,255,255,0.9); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  .unit-label { font-size: 10px; color: var(--text-tertiary); text-align: right; font-family: 'DM Mono', monospace; line-height: 1.4; }
+
+  .remove-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-tertiary); font-size: 18px;
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .remove-btn:hover { background: rgba(239,68,68,0.1); color: var(--red); }
+
+  .empty-state {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px; padding: 48px 24px; text-align: center;
+  }
+
+  .empty-icon {
+    width: 52px; height: 52px; border-radius: 14px;
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+  }
+
+  .empty-title { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+  .empty-sub { font-size: 12px; color: var(--text-secondary); max-width: 200px; line-height: 1.6; }
+
+  /* CALC BUTTON */
+  .calc-btn {
+    margin: 12px;
+    padding: 12px 20px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(99,102,241,0.3);
+    background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.12));
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--accent);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.2s;
+  }
+
+  .calc-btn:hover {
+    background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2));
+    border-color: var(--accent);
+    box-shadow: 0 4px 16px var(--accent-glow);
+    transform: translateY(-1px);
+  }
+
+  .calc-btn:active { transform: translateY(0); }
+
+  /* RIGHT PANEL */
+  .right-col { display: flex; flex-direction: column; gap: 0; }
+
+  .results-card { display: flex; flex-direction: column; }
+
+  .margin-total {
+    padding: 20px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.2);
+  }
+
+  .margin-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+
+  .margin-value {
+    font-size: 32px; font-weight: 300; color: var(--text-primary);
+    font-family: 'DM Sans', sans-serif; letter-spacing: -0.02em;
+    transition: all 0.4s;
+  }
+
+  .margin-value .currency { font-size: 18px; color: var(--text-secondary); margin-right: 2px; }
+
+  .breakdown-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; padding: 12px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.5);
+  }
+
+  .breakdown-item {
+    background: rgba(255,255,255,0.4);
+    border: 1px solid rgba(255,255,255,0.7);
+    border-radius: var(--radius-xs);
+    padding: 8px 10px;
+  }
+
+  .breakdown-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+  .breakdown-value { font-size: 14px; font-weight: 500; color: var(--text-primary); margin-top: 2px; font-family: 'DM Mono', monospace; }
+  .breakdown-value.positive { color: var(--green); }
+
+  /* STEPS */
+  .steps-section { flex: 1; display: flex; flex-direction: column; }
+
+  .step-tabs {
+    display: flex; gap: 4px; padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.5);
+    flex-wrap: wrap;
+    background: rgba(255,255,255,0.2);
+  }
+
+  .step-tab {
+    font-size: 11px; padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(200,200,240,0.4);
+    background: transparent;
+    cursor: pointer; color: var(--text-secondary);
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s; white-space: nowrap;
+  }
+
+  .step-tab:hover { background: rgba(255,255,255,0.5); border-color: rgba(200,200,240,0.7); }
+
+  .step-tab.active {
+    background: white;
+    border-color: rgba(99,102,241,0.3);
+    color: var(--accent);
+    box-shadow: 0 2px 8px rgba(99,102,241,0.1);
+  }
+
+  .progress-track {
+    height: 2px; background: rgba(200,200,240,0.3);
+    margin: 0 12px;
+  }
+
+  .progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--accent), #8b5cf6);
+    border-radius: 1px; transition: width 0.4s ease;
+  }
+
+  .step-body {
+    flex: 1; padding: 14px; overflow-y: auto;
+  }
+
+  .step-body::-webkit-scrollbar { width: 4px; }
+  .step-body::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.2); border-radius: 2px; }
+
+  .step-card {
+    border: 1px solid rgba(255,255,255,0.7);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: rgba(255,255,255,0.35);
+    animation: fadeIn 0.25s ease;
+  }
+
+  @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+
+  .step-card-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.6);
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.3);
+  }
+
+  .step-num-badge {
+    width: 22px; height: 22px; border-radius: 50%;
+    font-size: 11px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(99,102,241,0.12);
+    color: var(--accent);
+    border: 1px solid rgba(99,102,241,0.2);
+    flex-shrink: 0;
+  }
+
+  .step-num-badge.done {
+    background: rgba(16,185,129,0.12);
+    color: var(--green);
+    border-color: rgba(16,185,129,0.2);
+  }
+
+  .step-card-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+
+  .step-desc {
+    font-size: 12px; color: var(--text-secondary);
+    line-height: 1.65; padding: 10px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.5);
+  }
+
+  .step-table { width: 100%; padding: 10px 14px; }
+
+  .step-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(220,220,240,0.2);
+    font-size: 12px;
+  }
+
+  .step-row:last-child { border-bottom: none; }
+  .step-row-label { color: var(--text-secondary); }
+  .step-row-val { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-primary); font-weight: 400; }
+  .step-row-val.highlight { color: var(--accent); }
+  .step-row-val.green { color: var(--green); }
+
+  .nav-row {
+    display: flex; justify-content: space-between; padding: 10px 14px 0;
+  }
+
+  .nav-btn {
+    font-size: 12px; padding: 6px 12px;
+    border-radius: var(--radius-xs);
+    border: 1px solid rgba(200,200,240,0.5);
+    background: rgba(255,255,255,0.5);
+    cursor: pointer; color: var(--text-secondary);
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s; display: flex; align-items: center; gap: 5px;
+  }
+
+  .nav-btn:hover:not(:disabled) { background: rgba(255,255,255,0.8); color: var(--text-primary); }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .placeholder-msg {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: var(--text-tertiary); text-align: center;
+    padding: 24px;
+  }
+
+  /* MONO NUMBERS */
+  .mono { font-family: 'DM Mono', monospace; }
+
+  /* DIVIDER */
+  .divider { height: 1px; background: rgba(255,255,255,0.5); }
+
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo-mark">IM</div>
+      <div>
+        <div class="header-title">SIMM Initial Margin Calculator</div>
+        <div class="header-sub">Independent validation · SR 11-7 framework</div>
+      </div>
+    </div>
+    <span class="version-badge">ISDA SIMM v2.8</span>
+  </header>
+
+  <!-- MAIN -->
+  <div class="main-grid">
+
+    <!-- LEFT: PRODUCT LIST -->
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Products
+        </div>
+        <span id="productCount" style="font-size:11px;color:var(--text-tertiary)">14 instruments</span>
+      </div>
+      <div class="search-wrap">
+        <input class="search-input" type="text" id="searchBox" placeholder="Search instruments…" oninput="filterProducts()">
+      </div>
+      <div class="product-scroll" id="productList"></div>
+    </div>
+
+    <!-- MIDDLE: PORTFOLIO -->
+    <div class="middle-col">
+      <div class="glass-card portfolio-card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            Portfolio
+          </div>
+          <span id="positionCount" style="font-size:11px;color:var(--text-tertiary)">0 positions</span>
+        </div>
+        <div class="col-labels" id="colLabels" style="display:none">
+          <span>Instrument</span>
+          <span style="text-align:right">Sensitivity</span>
+          <span style="text-align:right">Unit</span>
+          <span></span>
+        </div>
+        <div class="portfolio-scroll" id="portfolioItems">
+          <div class="empty-state" id="emptyState">
+            <div class="empty-icon">＋</div>
+            <div class="empty-title">Portfolio is empty</div>
+            <div class="empty-sub">Click any instrument on the left to add it to your portfolio</div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <button class="calc-btn" onclick="calculate()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
+          Calculate initial margin
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT: RESULTS + STEPS -->
+    <div class="glass-card" style="display:flex;flex-direction:column">
+      <!-- Results -->
+      <div class="card-header">
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Results
+        </div>
+      </div>
+
+      <div class="margin-total">
+        <div class="margin-label">Total initial margin</div>
+        <div class="margin-value" id="totalIM"><span class="currency">$</span><span id="totalIMVal">—</span></div>
+      </div>
+
+      <div class="breakdown-grid" id="breakdownGrid">
+        <div class="breakdown-item" style="grid-column:1/-1;text-align:center;padding:14px">
+          <div class="breakdown-label" style="font-size:12px;color:var(--text-tertiary)">Add positions and hit calculate</div>
+        </div>
+      </div>
+
+      <!-- Steps -->
+      <div class="card-header" style="border-top:1px solid rgba(255,255,255,0.5)">
+        <div class="card-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Calculation steps
+        </div>
+      </div>
+
+      <div class="step-tabs" id="stepTabs">
+        <div style="font-size:12px;color:var(--text-tertiary);padding:2px 4px">Steps will appear after calculation</div>
+      </div>
+
+      <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+      <div class="step-body" id="stepBody">
+        <div class="placeholder-msg">Run the calculation to walk through each step of the SIMM formula</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const PRODUCTS = [
+  {id:'usd2y',  name:'USD 2Y OIS Swap',          type:'IR', bucket:'2Y',      rw:69,   unit:'PV01 $/bp',    defaultSens:125000},
+  {id:'usd5y',  name:'USD 5Y OIS Swap',          type:'IR', bucket:'5Y',      rw:61,   unit:'PV01 $/bp',    defaultSens:-90000},
+  {id:'usd10y', name:'USD 10Y OIS Swap',         type:'IR', bucket:'10Y',     rw:60,   unit:'PV01 $/bp',    defaultSens:160000},
+  {id:'usd1y',  name:'USD 1Y OIS Swap',          type:'IR', bucket:'1Y',      rw:68,   unit:'PV01 $/bp',    defaultSens:50000},
+  {id:'usd30y', name:'USD 30Y OIS Swap',         type:'IR', bucket:'30Y',     rw:66,   unit:'PV01 $/bp',    defaultSens:80000},
+  {id:'eurusd', name:'EUR/USD Forward',           type:'FX', bucket:'EURUSD',  rw:7.1,  unit:'$ per 1% move',defaultSens:1200000},
+  {id:'gbpusd', name:'GBP/USD Forward',           type:'FX', bucket:'GBPUSD',  rw:7.1,  unit:'$ per 1% move',defaultSens:-850000},
+  {id:'usdjpy', name:'USD/JPY Forward',           type:'FX', bucket:'USDJPY',  rw:7.1,  unit:'$ per 1% move',defaultSens:950000},
+  {id:'eurgbp', name:'EUR/GBP Forward',           type:'FX', bucket:'EURGBP',  rw:7.1,  unit:'$ per 1% move',defaultSens:300000},
+  {id:'b5eq',   name:'Dev Large Cap Consumer',    type:'EQ', bucket:'Bucket5', rw:23,   unit:'$ per 1% move',defaultSens:1500000},
+  {id:'b8eq',   name:'Dev Large Cap Financials',  type:'EQ', bucket:'Bucket8', rw:29,   unit:'$ per 1% move',defaultSens:-1100000},
+  {id:'b11eq',  name:'Index / ETF',               type:'EQ', bucket:'Bucket11',rw:17,   unit:'$ per 1% move',defaultSens:2000000},
+  {id:'b1eq',   name:'EM Large Cap Consumer',     type:'EQ', bucket:'Bucket1', rw:29,   unit:'$ per 1% move',defaultSens:500000},
+  {id:'b10eq',  name:'Dev Small Cap',             type:'EQ', bucket:'Bucket10',rw:39,   unit:'$ per 1% move',defaultSens:-300000},
+];
+
+const IR_CORR = {
+  '1Y': {'1Y':1,'2Y':0.94,'5Y':0.81,'10Y':0.73,'30Y':0.63},
+  '2Y': {'1Y':0.94,'2Y':1,'5Y':0.92,'10Y':0.86,'30Y':0.76},
+  '5Y': {'1Y':0.81,'2Y':0.92,'5Y':1,'10Y':0.96,'30Y':0.88},
+  '10Y':{'1Y':0.73,'2Y':0.86,'5Y':0.96,'10Y':1,'30Y':0.95},
+  '30Y':{'1Y':0.63,'2Y':0.76,'5Y':0.88,'10Y':0.95,'30Y':1},
+};
+const EQ_CORR = {
+  'Bucket1': {'Bucket1':1,'Bucket5':0.12,'Bucket8':0.14,'Bucket10':0.11,'Bucket11':0.17},
+  'Bucket5': {'Bucket1':0.12,'Bucket5':1,'Bucket8':0.31,'Bucket10':0.19,'Bucket11':0.29},
+  'Bucket8': {'Bucket1':0.14,'Bucket5':0.31,'Bucket8':1,'Bucket10':0.24,'Bucket11':0.37},
+  'Bucket10':{'Bucket1':0.11,'Bucket5':0.19,'Bucket8':0.24,'Bucket10':1,'Bucket11':0.25},
+  'Bucket11':{'Bucket1':0.17,'Bucket5':0.29,'Bucket8':0.37,'Bucket10':0.25,'Bucket11':1},
+};
+const CROSS = {IR:{IR:1,FX:0.10,EQ:0.12},FX:{IR:0.10,FX:1,EQ:0.24},EQ:{IR:0.12,FX:0.24,EQ:1}};
+const IR_T = 210e6, FX_T = 3100e6;
+const EQ_T = {'Bucket1':2.8e6,'Bucket5':14e6,'Bucket8':14e6,'Bucket10':0.33e6,'Bucket11':730e6};
+
+let portfolio = [];
+let stepData = [];
+let activeStep = 0;
+
+const fmt = n => '$' + Math.round(Math.abs(n)).toLocaleString();
+const fmtShort = n => {
+  const a = Math.abs(n);
+  if(a >= 1e6) return (n<0?'-':'') + '$' + (a/1e6).toFixed(2) + 'M';
+  if(a >= 1e3) return (n<0?'-':'') + '$' + (a/1e3).toFixed(0) + 'K';
+  return (n<0?'-':'') + '$' + Math.round(a).toLocaleString();
+};
+const fmtSens = n => (n>=0?'+':'')+Math.round(n).toLocaleString();
+const pillClass = t => t==='IR'?'pill-ir':t==='FX'?'pill-fx':'pill-eq';
+
+function filterProducts(){
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  document.querySelectorAll('.product-item').forEach(el=>{
+    el.style.display = el.dataset.search.includes(q) ? '' : 'none';
+  });
+}
+
+function renderProducts(){
+  const list = document.getElementById('productList');
+  list.innerHTML = PRODUCTS.map(p=>`
+    <div class="product-item ${portfolio.find(x=>x.id===p.id)?'added':''}" id="pitem_${p.id}" data-search="${p.name.toLowerCase()} ${p.type.toLowerCase()}" onclick="addProduct('${p.id}')">
+      <div class="product-info">
+        <div class="product-name">${p.name}</div>
+        <div class="product-meta">
+          <span class="type-pill ${pillClass(p.type)}">${p.type}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:10px">RW ${p.rw}${p.type==='IR'?'bp':'%'}</span>
+        </div>
+      </div>
+      <button class="add-btn" aria-label="Add ${p.name}">+</button>
+    </div>
+  `).join('');
+}
+
+function addProduct(id){
+  if(portfolio.find(x=>x.id===id)) return;
+  const p = PRODUCTS.find(x=>x.id===id);
+  portfolio.push({...p, sens: p.defaultSens});
+  renderPortfolio();
+  renderProducts();
+  resetResults();
+}
+
+function removeProduct(id){
+  portfolio = portfolio.filter(x=>x.id!==id);
+  renderPortfolio();
+  renderProducts();
+  resetResults();
+}
+
+function updateSens(id, val){
+  const p = portfolio.find(x=>x.id===id);
+  if(p) p.sens = parseFloat(val)||0;
+  resetResults();
+}
+
+function renderPortfolio(){
+  const el = document.getElementById('portfolioItems');
+  const empty = document.getElementById('emptyState');
+  const cols = document.getElementById('colLabels');
+  document.getElementById('positionCount').textContent = portfolio.length + ' position' + (portfolio.length!==1?'s':'');
+  if(!portfolio.length){
+    el.innerHTML = '';
+    el.appendChild(empty);
+    empty.style.display = 'flex';
+    cols.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  cols.style.display = 'grid';
+  el.innerHTML = portfolio.map(p=>`
+    <div class="portfolio-row">
+      <div>
+        <div class="p-name">${p.name}</div>
+        <div class="p-sub">
+          <span class="type-pill ${pillClass(p.type)}">${p.type}</span>
+          <span style="color:var(--text-tertiary)">${p.bucket}</span>
+        </div>
+      </div>
+      <input class="sens-input" type="number" value="${p.sens}" step="10000"
+             onchange="updateSens('${p.id}',this.value)"
+             onblur="updateSens('${p.id}',this.value)">
+      <div class="unit-label">${p.unit}</div>
+      <button class="remove-btn" onclick="removeProduct('${p.id}')" aria-label="Remove">×</button>
+    </div>
+  `).join('');
+}
+
+function resetResults(){
+  stepData = [];
+  activeStep = 0;
+  document.getElementById('totalIMVal').textContent = '—';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('stepTabs').innerHTML = '<div style="font-size:12px;color:var(--text-tertiary);padding:2px 4px">Steps will appear after calculation</div>';
+  document.getElementById('stepBody').innerHTML = '<div class="placeholder-msg">Run the calculation to walk through each step of the SIMM formula</div>';
+  document.getElementById('breakdownGrid').innerHTML = '<div class="breakdown-item" style="grid-column:1/-1;text-align:center;padding:14px"><div class="breakdown-label" style="font-size:12px;color:var(--text-tertiary)">Add positions and hit calculate</div></div>';
+}
+
+function getCR(p){
+  let t;
+  if(p.type==='IR') t = IR_T;
+  else if(p.type==='FX') t = FX_T;
+  else t = EQ_T[p.bucket]||1e9;
+  return Math.max(1, Math.sqrt(Math.abs(p.sens)/t));
+}
+
+function getCorr(a,b){
+  if(a.type!==b.type) return 0;
+  if(a.id===b.id) return 1;
+  if(a.type==='FX') return 0.50;
+  if(a.type==='IR') return IR_CORR[a.bucket]?.[b.bucket]||0;
+  if(a.type==='EQ') return EQ_CORR[a.bucket]?.[b.bucket]||0;
+  return 0;
+}
+
+function aggreg(items){
+  if(!items.length) return 0;
+  let s = 0;
+  items.forEach((a,i)=>items.forEach((b,j)=>{ s += getCorr(a,b)*a.ws*b.ws; }));
+  return Math.sqrt(Math.abs(s));
+}
+
+function calculate(){
+  if(!portfolio.length){ return; }
+
+  portfolio.forEach(p=>{
+    p.cr  = getCR(p);
+    p.rwd = p.type==='IR' ? p.rw : p.rw/100;
+    p.ws  = p.sens * p.rwd * p.cr;
+  });
+
+  const ir = portfolio.filter(x=>x.type==='IR');
+  const fx = portfolio.filter(x=>x.type==='FX');
+  const eq = portfolio.filter(x=>x.type==='EQ');
+
+  const irM = aggreg(ir), fxM = aggreg(fx), eqM = aggreg(eq);
+
+  const cls = [], cms = [], ctp = [];
+  if(ir.length){cls.push('IR');cms.push(irM);ctp.push('Interest Rate');}
+  if(fx.length){cls.push('FX');cms.push(fxM);ctp.push('FX');}
+  if(eq.length){cls.push('EQ');cms.push(eqM);ctp.push('Equity');}
+
+  let crossSum = 0;
+  cls.forEach((a,i)=>cls.forEach((b,j)=>{ crossSum += CROSS[a][b]*cms[i]*cms[j]; }));
+  const totalIM = Math.sqrt(Math.abs(crossSum));
+  const naiveSum = portfolio.reduce((s,p)=>s+Math.abs(p.ws),0);
+  const divBen = naiveSum - totalIM;
+
+  // animate total
+  animateValue('totalIMVal', totalIM);
+
+  // breakdown cards
+  let bdHTML = '';
+  if(ir.length) bdHTML += `<div class="breakdown-item"><div class="breakdown-label">IR delta</div><div class="breakdown-value">${fmtShort(irM)}</div></div>`;
+  if(fx.length) bdHTML += `<div class="breakdown-item"><div class="breakdown-label">FX delta</div><div class="breakdown-value">${fmtShort(fxM)}</div></div>`;
+  if(eq.length) bdHTML += `<div class="breakdown-item"><div class="breakdown-label">Equity delta</div><div class="breakdown-value">${fmtShort(eqM)}</div></div>`;
+  bdHTML += `<div class="breakdown-item"><div class="breakdown-label">Diversification</div><div class="breakdown-value positive">−${fmtShort(divBen)}</div></div>`;
+  document.getElementById('breakdownGrid').innerHTML = bdHTML;
+
+  // Build step data
+  stepData = [
+    {
+      title:'Portfolio loaded',
+      desc:'Raw sensitivities from your portfolio. These represent the dollar change in position value per unit market move.',
+      rows: portfolio.map(p=>({label:p.name, val: fmtSens(p.sens)+' '+p.unit.split(' ')[0], cls:''}))
+    },
+    {
+      title:'Risk weights applied',
+      desc:'Each sensitivity × ISDA v2.8 risk weight × concentration risk factor. This converts sensitivity into a stressed dollar loss at the 99th percentile over a 10-day window.',
+      rows: portfolio.map(p=>({
+        label:`${p.name} (RW ${p.rw}${p.type==='IR'?'bp':'%'}, CR ${p.cr.toFixed(2)}×)`,
+        val: fmt(p.ws), cls: Math.abs(p.ws)>5e6?'highlight':''
+      }))
+    },
+    {
+      title:'Intra-class aggregation',
+      desc:`Weighted sensitivities aggregated within each asset class using ISDA correlation matrices. High correlations between tenors/pairs reduce the total — offsetting positions get recognized.`,
+      rows:[
+        ir.length?{label:'Interest Rate delta margin', val:fmt(irM), cls:'highlight'}:null,
+        fx.length?{label:'FX delta margin', val:fmt(fxM), cls:'highlight'}:null,
+        eq.length?{label:'Equity delta margin', val:fmt(eqM), cls:'highlight'}:null,
+      ].filter(Boolean)
+    },
+    {
+      title:'Cross-class aggregation',
+      desc:'Asset classes combined using Section K correlations from ISDA v2.8 (IR↔FX 10%, IR↔EQ 12%, FX↔EQ 24%). Different asset classes are largely independent, so diversification is limited here.',
+      rows:[
+        {label:'Naive sum (no offsets at all)', val:fmt(naiveSum), cls:''},
+        {label:'Diversification saving', val:'−'+fmt(divBen), cls:'green'},
+        {label:'Total initial margin', val:fmt(totalIM), cls:'highlight'},
+      ]
+    },
+    {
+      title:'Final assessment',
+      desc:'Delta Margin computed using official ISDA SIMM v2.8 parameters. Vega and Curvature margin are not included in this calculation — further validation required per SR 11-7.',
+      rows:[
+        {label:'Delta margin (this calculation)', val:fmt(totalIM), cls:'highlight'},
+        {label:'Vega margin', val:'Not computed', cls:''},
+        {label:'Curvature margin', val:'Not computed', cls:''},
+        {label:'Model rating', val:'Conditionally approved', cls:''},
+      ]
+    }
+  ];
+
+  renderStepTabs();
+  setStep(0);
+}
+
+function animateValue(id, target){
+  const el = document.getElementById(id);
+  const start = 0, dur = 600;
+  const startTime = performance.now();
+  function step(now){
+    const t = Math.min((now-startTime)/dur, 1);
+    const ease = t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+    el.textContent = Math.round(target*ease).toLocaleString();
+    if(t<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function renderStepTabs(){
+  const tabs = document.getElementById('stepTabs');
+  tabs.innerHTML = stepData.map((s,i)=>`
+    <button class="step-tab ${i===0?'active':''}" id="stab${i}" onclick="setStep(${i})">
+      ${i+1}. ${s.title.split(' ')[0]}
+    </button>
+  `).join('');
+}
+
+function setStep(i){
+  activeStep = i;
+  document.querySelectorAll('.step-tab').forEach((t,j)=>t.classList.toggle('active',j===i));
+  document.getElementById('progressFill').style.width = ((i+1)/stepData.length*100)+'%';
+  const s = stepData[i];
+  const body = document.getElementById('stepBody');
+  body.innerHTML = `
+    <div class="step-card">
+      <div class="step-card-header">
+        <div class="step-num-badge ${i===stepData.length-1?'done':''}">${i+1}</div>
+        <div class="step-card-title">${s.title}</div>
+      </div>
+      <div class="step-desc">${s.desc}</div>
+      <div class="step-table">
+        ${s.rows.map(r=>`
+          <div class="step-row">
+            <span class="step-row-label">${r.label}</span>
+            <span class="step-row-val ${r.cls||''}">${r.val}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="nav-row">
+      <button class="nav-btn" onclick="setStep(${i-1})" ${i===0?'disabled':''}>
+        ← Previous
+      </button>
+      <span style="font-size:11px;color:var(--text-tertiary);align-self:center">${i+1} / ${stepData.length}</span>
+      <button class="nav-btn" onclick="setStep(${i+1})" ${i===stepData.length-1?'disabled':''}>
+        Next →
+      </button>
+    </div>
+  `;
+}
+
+renderProducts();
+renderPortfolio();
+</script>
+</body>
+</html>
